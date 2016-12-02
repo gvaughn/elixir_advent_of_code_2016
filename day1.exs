@@ -1,49 +1,42 @@
-# `elixir day1.exs for results`
+# `elixir day1.exs` for results
 defmodule Day1 do
-  @start {0,0,"N"}
 
-  def net_distance(steps) do
-    {_, last} = travel(steps)
-    distance(last)
+  def net_distance(steps), do: travel(steps, &List.last/1)
+
+  def first_revisit_distance(steps), do: travel(steps, &first_revisit(&1, nil))
+
+  defp travel(steps, extractor_fn) do
+    {coordinates, _} = steps
+      |> String.split(", ")
+      |> Enum.flat_map_reduce({0, 0, :n}, fn cmd, pos ->
+        [dir, len_str] = String.split(cmd, ~r{}, parts: 2)
+        new_pos = pos |> turn(dir) |> step(String.to_integer(len_str))
+        {new_pos, List.last(new_pos)}
+      end)
+
+    coordinates
+      |> extractor_fn.()
+      |> manhattan_distance
   end
 
-  def first_revisit_distance(steps) do
-    {stops, _} = travel(steps)
-    [@start | stops]
-    |> Stream.chunk(2, 1)
-    |> Stream.flat_map(&expand_path/1)
-    |> Enum.dedup
-    |> first_revisit(nil)
-    |> distance
+  @turn %{"R" => [n: :e, e: :s, s: :w, w: :n], "L" => [n: :w, w: :s, s: :e, e: :n]}
+  defp turn({x, y, h}, dir), do: {x, y, @turn[dir][h]}
+
+  defp step({x, y, :n}, len), do: Enum.map((y+1)..(y+len), &{x, &1, :n})
+  defp step({x, y, :e}, len), do: Enum.map((x+1)..(x+len), &{&1, y, :e})
+  defp step({x, y, :s}, len), do: Enum.map((y-1)..(y-len), &{x, &1, :s})
+  defp step({x, y, :w}, len), do: Enum.map((x-1)..(x-len), &{&1, y, :w})
+
+  defp first_revisit([], match), do: match
+  defp first_revisit([candidate | rest], nil) do
+    first_revisit(rest, Enum.find(rest, &xy_match(candidate, &1)))
   end
+  defp first_revisit(_, success), do: success
 
-  defp travel(steps) do
-    steps
-    |> String.split(", ")
-    |> Enum.map_reduce(@start, fn cmd, pos ->
-      [dir, len_str] = String.split(cmd, ~r{}, parts: 2)
-      new_pos = pos |> turn(dir) |> step(String.to_integer(len_str))
-      {new_pos, new_pos}
-    end)
-  end
+  defp xy_match({x1, y1, _}, {x2, y2, _}), do: x1 == x2 && y1 == y2
 
-  for {curr, turn, result} <- [{"N", "R", "E"}, {"E", "R", "S"}, {"S", "R", "W"}, {"W", "R", "N"}, {"N", "L", "W"}, {"E", "L", "N"}, {"S", "L", "E"}, {"W", "L", "S"}] do
-    defp turn({x, y, unquote(curr)}, unquote(turn)), do: {x, y, unquote(result)}
-  end
-
-  defp step({x, y, "N"}, len), do: {x,       y + len, "N"}
-  defp step({x, y, "E"}, len), do: {x + len, y,       "E"}
-  defp step({x, y, "S"}, len), do: {x,       y - len, "S"}
-  defp step({x, y, "W"}, len), do: {x - len, y,       "W"}
-
-  defp expand_path([{x,  y1, _}, {x,  y2, _}]), do: Stream.map(y1..y2, &{x, &1, nil})
-  defp expand_path([{x1, y,  _}, {x2, y,  _}]), do: Stream.map(x1..x2, &{&1, y, nil})
-
-  defp first_revisit([],             match  ), do: match
-  defp first_revisit([match | rest], nil    ), do: first_revisit(rest, Enum.find(rest, &Kernel.==(match, &1)))
-  defp first_revisit(_,              success), do: success
-
-  defp distance({x, y, _}), do: abs(x) + abs(y)
+  defp manhattan_distance({x, y, _}), do: abs(x) + abs(y)
+  defp manhattan_distance(_), do: nil
 end
 
 ExUnit.start
