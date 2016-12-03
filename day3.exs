@@ -9,7 +9,7 @@ defmodule Day3 do
     |> String.split
     |> Enum.map(&String.to_integer/1)
     |> triplet_matcher.()
-    |> Enum.reduce(0, &incr_possible/2)
+    |> Enum.count(&possible_triangle?/1)
   end
 
   defp match_triples_horizontally(int_list), do: Enum.chunk(int_list, 3)
@@ -23,8 +23,8 @@ defmodule Day3 do
     end)
   end
 
-  defp incr_possible([a, b, c], count) when a+b>c and a+c>b and b+c>a, do: count + 1
-  defp incr_possible(_, count), do: count
+  defp possible_triangle?([a, b, c]) when a+b>c and a+c>b and b+c>a, do: true
+  defp possible_triangle?(_), do: false
 end
 
 ExUnit.start
