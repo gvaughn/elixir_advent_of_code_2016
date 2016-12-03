@@ -1,11 +1,26 @@
 defmodule Day3 do
 
-  def possible_triangles(input) do
+  def possible_triangles_horizontal_layout(input), do: count_possible_triangles(input, &match_triples_horizontally/1)
+
+  def possible_triangles_vertical_layout(input), do: count_possible_triangles(input, &match_triples_vertically/1)
+
+  defp count_possible_triangles(input, triplet_matcher) do
     input
     |> String.split
     |> Enum.map(&String.to_integer/1)
-    |> Enum.chunk(3)
+    |> triplet_matcher.()
     |> Enum.reduce(0, &incr_possible/2)
+  end
+
+  defp match_triples_horizontally(int_list), do: Enum.chunk(int_list, 3)
+
+  defp match_triples_vertically(int_list) do
+    int_list
+    |> Enum.chunk(3)
+    |> Enum.chunk(3)
+    |> Enum.flat_map(fn [[a,b,c], [d,e,f], [g,h,i]] ->
+      [[a,d,g], [b,e,h], [c,f,i]]
+    end)
   end
 
   defp incr_possible([a, b, c], count) when a+b>c and a+c>b and b+c>a, do: count + 1
@@ -1929,13 +1944,27 @@ defmodule Day3Test do
    40  813  103
   436  766  254
   """
-  test "part 1 example", do: assert 0 = Day3.possible_triangles("5 10 25")
-  test "my example", do: assert 1 = Day3.possible_triangles("5 10 25 3 4 5")
+
+  test "my example" do
+    input = """
+    5  6 3
+    10 6 4
+    25 6 5
+    """
+    assert 1 = Day3.possible_triangles_horizontal_layout(input)
+    assert 2 = Day3.possible_triangles_vertical_layout(input)
+  end
 
   test "part 1 solution" do
-    possible_count = Day3.possible_triangles(@input)
-    IO.puts "Possible triangles: #{possible_count}"
+    possible_count = Day3.possible_triangles_horizontal_layout(@input)
+    IO.puts "Possible horizontal triangles: #{possible_count}"
     assert 993 = possible_count
+  end
+
+  test "part 2 solution" do
+    possible_count = Day3.possible_triangles_vertical_layout(@input)
+    IO.puts "Possible vertical triangles: #{possible_count}"
+    assert 1849 = possible_count
   end
 end
 
