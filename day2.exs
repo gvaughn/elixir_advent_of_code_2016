@@ -11,16 +11,12 @@ defmodule Day2 do
   def diamond_code(instr), do: perform(instr, @diamond_step)
 
   defp perform(instr, step_mapper, initial_digit \\ "5") do
-    {code_list, _} = instr
-      |> String.split
-      |> Enum.map_reduce(initial_digit, fn line, digit ->
-        new_digit = line
-          |> String.codepoints
-          |> Enum.reduce(digit, step_lookup_fn(step_mapper))
-        {new_digit, new_digit}
-      end)
-
-    Enum.join(code_list)
+    instr
+    |> String.split
+    |> Enum.scan(initial_digit, fn line, digit ->
+      Enum.reduce(String.codepoints(line), digit, step_lookup_fn(step_mapper))
+    end)
+    |> Enum.join
   end
 
   defp step_lookup_fn(step_mapper) do
