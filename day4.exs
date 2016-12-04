@@ -1,47 +1,54 @@
 defmodule Day4 do
 
-  def real_room_checksum(name) do
-    {info, count} = Regex.scan(~r{\s*([^\d]+)(\d+)\[(\w+)\]}, name)
-    |> Enum.map_reduce(0, &checksum_or_not/2)
-    count
+  @alpha String.codepoints "abcdefghijklmnopqrstuvwxyz"
+  @scanner_re ~r{\s*([^\d]+)-(\d+)\[(\w+)\]}
+
+  def real_room_checksum(input) do
+    input
+    |> valid_rooms
+    |> Enum.map(&List.last/1)
+    |> Enum.sum
   end
 
-  defp checksum_or_not([_, name, sector, checksum], acc) do
-    if checksum_matches(name, checksum) do
-      {[name, String.to_integer(sector)], acc + String.to_integer(sector)}
-    else
-      {[], acc}
-    end
+  def find_decrypted(input, target \\ "") do
+    input
+    |> valid_rooms
+    |> Enum.map(&decrypt_name/1)
+    |> Enum.find(fn [name, _] -> String.contains?(name, target) end)
   end
 
-  defp checksum_matches(name, checksum) do
-    calculated_checksum = Enum.reduce(String.codepoints(name), %{}, fn cp, map ->
-      Map.update(map, cp, 1, &(&1 + 1))
+  defp valid_rooms(input) do
+    Regex.scan(@scanner_re, input, capture: :all_but_first)
+    |> Enum.reduce([], fn [name, sector_str, ck], acc ->
+      if checksum(name) == ck, do: [[name, String.to_integer(sector_str)] | acc], else: acc
     end)
+  end
+
+  defp checksum(name) do
+    name
+    |> String.codepoints
+    |> Enum.reduce(%{}, fn cp, map -> Map.update(map, cp, 1, &(&1 + 1)) end)
     |> Map.delete("-")
     |> Enum.sort(fn {aa, ac}, {ba, bc} -> if ac == bc, do: aa < ba, else: ac > bc end)
     |> Enum.take(5)
-    |> Enum.map(&elem(&1, 0))
-    |> Enum.join
-
-    calculated_checksum == checksum
+    |> Enum.map_join(&elem(&1, 0))
   end
 
-  @a String.codepoints "abcdefghijklmnopqrstuvwxyz"
+  defp decrypt_name([name, sector]) do
+    new_name = name
+    |> String.codepoints
+    |> Enum.map_join(&Map.get(decipher(sector), &1))
 
-  def name_decrypted(name) do
-    {info, count} = Regex.scan(~r{\s*([^\d]+)(\d+)\[(\w+)\]}, name)
-    |> Enum.map_reduce(0, &checksum_or_not/2)
+    [new_name, sector]
+  end
 
-    info
-    |> Enum.map(fn [name, offset] -> d = @a |> Stream.cycle |> Stream.drop(26 - rem(offset, 26)) |> Stream.take(26) |> Enum.zip(@a) |> Map.new
-      decrypted = Enum.map(String.codepoints(name), fn c -> Map.get(d, c) end)
-      |> Enum.map(fn nil -> " "
-      c -> c end)
-      |> Enum.join
-      [decrypted, offset]
-      [] -> []
-    end)
+  defp decipher(offset) do
+    @alpha
+    |> Stream.cycle
+    |> Stream.drop(26 - rem(offset, 26))
+    |> Enum.zip(@alpha)
+    |> Map.new
+    |> Map.put("-", " ")
   end
 end
 
@@ -67,7 +74,7 @@ defmodule Day4Test do
   end
 
   test "part 2 example" do
-    assert [["very encrypted name ", 343]] = Day4.name_decrypted("qzmt-zixmtkozy-ivhz-343[zimth]")
+    assert ["very encrypted name", 343] = Day4.find_decrypted("qzmt-zixmtkozy-ivhz-343[zimth]")
   end
 
   test "part 1 solution" do
@@ -77,11 +84,10 @@ defmodule Day4Test do
   end
 
   test "part 2 solution" do
-    wha = Day4.name_decrypted(@input)
-    where_north_pole_objects_stored = Enum.find(wha, fn [n, c] -> String.contains?(n, "north")
-    _ -> false end)
-    IO.inspect where_north_pole_objects_stored
-    assert ["northpole object storage ", 991] = where_north_pole_objects_stored
+    target_str = "northpole"
+    [name, sector] = Day4.find_decrypted(@input, target_str)
+    IO.puts "Found #{target_str} in '#{name}' sector #{sector}"
+    assert 991 = sector
   end
 end
 
