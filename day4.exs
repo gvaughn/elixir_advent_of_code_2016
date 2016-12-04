@@ -29,7 +29,7 @@ defmodule Day4 do
     |> String.codepoints
     |> Enum.reduce(%{}, fn cp, map -> Map.update(map, cp, 1, &(&1 + 1)) end)
     |> Map.delete("-")
-    |> Enum.sort(fn {aa, ac}, {ba, bc} -> if ac == bc, do: aa < ba, else: ac > bc end)
+    |> Enum.sort_by(fn {letter, freq} -> {-freq, letter} end)
     |> Enum.take(5)
     |> Enum.map_join(&elem(&1, 0))
   end
