@@ -1,15 +1,16 @@
 defmodule Day4 do
 
   def real_room_checksum(name) do
-    Regex.scan(~r{\s*([^\d]+)(\d+)\[(\w+)\]}, name)
-    |> Enum.reduce(0, &checksum_or_not/2)
+    {info, count} = Regex.scan(~r{\s*([^\d]+)(\d+)\[(\w+)\]}, name)
+    |> Enum.map_reduce(0, &checksum_or_not/2)
+    count
   end
 
   defp checksum_or_not([_, name, sector, checksum], acc) do
     if checksum_matches(name, checksum) do
-      acc + String.to_integer(sector)
+      {[name, String.to_integer(sector)], acc + String.to_integer(sector)}
     else
-      acc
+      {[], acc}
     end
   end
 
@@ -26,7 +27,21 @@ defmodule Day4 do
     calculated_checksum == checksum
   end
 
-  def name_decrypted(input) do
+  @a String.codepoints "abcdefghijklmnopqrstuvwxyz"
+
+  def name_decrypted(name) do
+    {info, count} = Regex.scan(~r{\s*([^\d]+)(\d+)\[(\w+)\]}, name)
+    |> Enum.map_reduce(0, &checksum_or_not/2)
+
+    info
+    |> Enum.map(fn [name, offset] -> d = @a |> Stream.cycle |> Stream.drop(26 - rem(offset, 26)) |> Stream.take(26) |> Enum.zip(@a) |> Map.new
+      decrypted = Enum.map(String.codepoints(name), fn c -> Map.get(d, c) end)
+      |> Enum.map(fn nil -> " "
+      c -> c end)
+      |> Enum.join
+      [decrypted, offset]
+      [] -> []
+    end)
   end
 end
 
@@ -51,10 +66,22 @@ defmodule Day4Test do
     assert 123 + 987 + 404 = Day4.real_room_checksum(input)
   end
 
+  test "part 2 example" do
+    assert [["very encrypted name ", 343]] = Day4.name_decrypted("qzmt-zixmtkozy-ivhz-343[zimth]")
+  end
+
   test "part 1 solution" do
     sum_of_sectors = Day4.real_room_checksum(@input)
     IO.puts "Sum of sectors: #{sum_of_sectors}"
     assert 409147 = sum_of_sectors
+  end
+
+  test "part 2 solution" do
+    wha = Day4.name_decrypted(@input)
+    where_north_pole_objects_stored = Enum.find(wha, fn [n, c] -> String.contains?(n, "north")
+    _ -> false end)
+    IO.inspect where_north_pole_objects_stored
+    assert ["northpole object storage ", 991] = where_north_pole_objects_stored
   end
 end
 
