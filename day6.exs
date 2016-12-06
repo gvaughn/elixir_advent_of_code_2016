@@ -1,19 +1,24 @@
 defmodule Day6 do
 
-  def decorrupt(signal) do
+  def decorrupt_most_frequent(signal),   do: decorrupt(signal, :max)
+  def decorrupt_least_frequenst(signal), do: decorrupt(signal, :min)
+
+  def decorrupt(signal, selector) do
     signal
     |> String.split
-    |> Enum.map(&String.graphemes/1)
-    |> Enum.flat_map(&Enum.with_index/1)
-    |> Enum.reduce([%{}, %{}, %{}, %{}, %{}, %{}, %{}, %{}], fn {c, col}, col_maps ->
-      List.replace_at(col_maps, col, update_map(Enum.at(col_maps, col), c))
-    end)
-    |> Enum.map(&Enum.sort_by(&1, fn {c, f} -> {-f,c} end))
-    |> Enum.map(&Enum.at(&1, 0, {"", 0}))
-    |> Enum.map_join(&elem(&1, 0))
+    |> Enum.flat_map(fn str -> Enum.with_index(String.graphemes(str)) end) # [{letter, column}, ...]
+    |> Enum.group_by(&elem(&1, 1), fn {char, _col} -> char end) # map of column => list of letters
+    |> Enum.map_join(fn {_col, chars} -> character_selection(chars, selector) end)
   end
 
-  defp update_map(map, char), do: Map.update(map, char, 1, &(&1+1))
+  defp character_selection(chars, :max), do: character_selection(chars, &Enum.max_by/2)
+  defp character_selection(chars, :min), do: character_selection(chars, &Enum.min_by/2)
+  defp character_selection(chars, selector) do
+    chars
+    |> Enum.reduce(%{}, fn char, map -> Map.update(map, char, 1, &(&1+1)) end)
+    |> selector.(&elem(&1, 1))
+    |> elem(0)
+  end
 end
 
 ExUnit.start()
@@ -21,34 +26,25 @@ ExUnit.start()
 defmodule Day6Test do
   use ExUnit.Case, async: true
   @input File.stream!(__ENV__.file) |> Stream.drop_while(&(&1 != "# ==DATA==\n")) |> Stream.drop(1) |> Stream.map(&String.trim(&1, "# ")) |> Enum.join
+  @example """
+    eedadn drvtee eandsr raavrd atevrs tsrnev sdttsa rasrtv
+    nssdts ntnada svetve tesnvt vntsnd vrdear dvrsen enarar
+  """
 
-  test "part 1 example" do
-    input = """
-      eedadn
-      drvtee
-      eandsr
-      raavrd
-      atevrs
-      tsrnev
-      sdttsa
-      rasrtv
-      nssdts
-      ntnada
-      svetve
-      tesnvt
-      vntsnd
-      vrdear
-      dvrsen
-      enarar
-    """
-    message = Day6.decorrupt(input)
-    assert "easter" = message
-  end
+  test "part 1 example", do: assert "easter" = Day6.decorrupt_most_frequent(@example)
+
+  test "part 2 example", do: assert "advent" = Day6.decorrupt_least_frequenst(@example)
 
   test "part 1" do
-    message = Day6.decorrupt(@input)
-    IO.puts "decorrupted: #{message}"
+    message = Day6.decorrupt_most_frequent(@input)
+    IO.puts "decorrupted via most freq: #{message}"
     assert "afwlyyyq" = message
+  end
+
+  test "part 2" do
+    message = Day6.decorrupt_least_frequenst(@input)
+    IO.puts "decorrupted via least freq: #{message}"
+    assert "bhkzekao" = message
   end
 end
 
