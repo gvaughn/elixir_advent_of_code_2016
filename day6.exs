@@ -1,15 +1,20 @@
 defmodule Day6 do
 
-  def decorrupt_most_frequent(signal),   do: decorrupt(signal, :max)
-  def decorrupt_least_frequenst(signal), do: decorrupt(signal, :min)
-
-  def decorrupt(signal, selector) do
+  def decorrupt(signal, selector) when selector in [:min, :max] do
     signal
     |> String.split
-    |> Enum.flat_map(fn str -> Enum.with_index(String.graphemes(str)) end) # [{letter, column}, ...]
-    |> Enum.group_by(&elem(&1, 1), fn {char, _col} -> char end) # map of column => list of letters
-    |> Enum.map_join(fn {_col, chars} -> character_selection(chars, selector) end)
+    |> to_column_list
+    |> Enum.map_join(&character_selection(&1, selector))
   end
+
+  defp to_column_list(row_list) do
+    row_list
+    |> Enum.flat_map(&letter_column_tuple/1)
+    |> Enum.group_by(&elem(&1, 1), &elem(&1, 0)) # %{column => list[letters]}
+    |> Enum.map(&elem(&1, 1))
+  end
+
+  defp letter_column_tuple(str), do: str |> String.graphemes |> Enum.with_index
 
   defp character_selection(chars, :max), do: character_selection(chars, &Enum.max_by/2)
   defp character_selection(chars, :min), do: character_selection(chars, &Enum.min_by/2)
@@ -31,19 +36,18 @@ defmodule Day6Test do
     nssdts ntnada svetve tesnvt vntsnd vrdear dvrsen enarar
   """
 
-  test "part 1 example", do: assert "easter" = Day6.decorrupt_most_frequent(@example)
-
-  test "part 2 example", do: assert "advent" = Day6.decorrupt_least_frequenst(@example)
+  test "part 1 example", do: assert "easter" = Day6.decorrupt(@example, :max)
+  test "part 2 example", do: assert "advent" = Day6.decorrupt(@example, :min)
 
   test "part 1" do
-    message = Day6.decorrupt_most_frequent(@input)
-    IO.puts "decorrupted via most freq: #{message}"
+    message = Day6.decorrupt(@input, :max)
+    IO.puts "decorrupted via max freq: #{message}"
     assert "afwlyyyq" = message
   end
 
   test "part 2" do
-    message = Day6.decorrupt_least_frequenst(@input)
-    IO.puts "decorrupted via least freq: #{message}"
+    message = Day6.decorrupt(@input, :min)
+    IO.puts "decorrupted via min freq: #{message}"
     assert "bhkzekao" = message
   end
 end
