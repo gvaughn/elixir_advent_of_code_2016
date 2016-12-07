@@ -1,13 +1,17 @@
 defmodule Day7 do
-  @abba ~r{(\w)((?!\1)\w)\2\1}
-  @hypernet_abba ~r{\[\w*#{Regex.source @abba}\w*\]}
 
-  def count_TLS(input) do
+  def count(input, :tls), do: count(input, &valid_tls?/1)
+  def count(input, :ssl), do: count(input, &valid_ssl?/1)
+
+  def count(input, valid_filter) do
     input
     |> String.split
-    |> Stream.filter(&valid_tls?/1)
+    |> Stream.filter(valid_filter)
     |> Enum.count
   end
+
+  @abba ~r{(\w)((?!\1)\w)\2\1}
+  @hypernet_abba ~r{\[\w*#{Regex.source @abba}\w*\]}
 
   defp valid_tls?(ipv7) do
     case String.match?(ipv7, @hypernet_abba) do
@@ -16,6 +20,16 @@ defmodule Day7 do
     end
   end
 
+  @aba ~r{(?=(\w)(\w)\1)}
+
+  defp valid_ssl?(ipv7) do
+    with split  <- String.split(ipv7, ~r{\[|\]}),
+      plainnet  = split |>                 Enum.take_every(2) |> Enum.join(" "),
+      hypernet  = split |> Enum.drop(1) |> Enum.take_every(2) |> Enum.join(" "),
+      plain_aba = Regex.scan(@aba, plainnet, capture: :all_but_first) |>                              Enum.map(&Enum.join/1),
+      hyper_aba = Regex.scan(@aba, hypernet, capture: :all_but_first) |> Enum.map(&Enum.reverse/1) |> Enum.map(&Enum.join/1),
+    do: Enum.any?(plain_aba, fn aba -> Enum.find_value(hyper_aba, false, &(&1 == aba)) end)
+  end
 end
 
 ExUnit.start()
@@ -24,15 +38,26 @@ defmodule Day7Test do
   use ExUnit.Case, async: true
   @input File.stream!(__ENV__.file) |> Stream.drop_while(&(&1 != "# ==DATA==\n")) |> Stream.drop(1) |> Stream.map(&String.trim(&1, "# ")) |> Enum.join
 
-  test "part 1 example 1", do: assert 1 = Day7.count_TLS("abba[mnop]qrst")
-  test "part 1 example 2", do: assert 0 = Day7.count_TLS("abcd[bddb]xyyx")
-  test "part 1 example 3", do: assert 0 = Day7.count_TLS("aaaa[qwer]tyui")
-  test "part 1 example 4", do: assert 1 = Day7.count_TLS("ioxxoj[asdfgh]zxcvbn")
+  test "part 1 example 1", do: assert 1 = Day7.count("abba[mnop]qrst", :tls)
+  test "part 1 example 2", do: assert 0 = Day7.count("abcd[bddb]xyyx", :tls)
+  test "part 1 example 3", do: assert 0 = Day7.count("aaaa[qwer]tyui", :tls)
+  test "part 1 example 4", do: assert 1 = Day7.count("ioxxoj[asdfgh]zxcvbn", :tls)
+
+  test "part 2 example 1", do: assert 1 = Day7.count("aba[bab]xyz", :ssl)
+  test "part 2 example 2", do: assert 0 = Day7.count("xyx[xyx]xyx", :ssl)
+  test "part 2 example 3", do: assert 1 = Day7.count("aaa[kek]eke", :ssl)
+  test "part 2 example 4", do: assert 1 = Day7.count("zazbz[bzb]cdb", :ssl)
 
   test "part 1 input" do
-    tls_count = Day7.count_TLS(@input)
+    tls_count = Day7.count(@input, :tls)
     IO.puts "#{tls_count} addresses support TLS"
     assert 115 = tls_count
+  end
+
+  test "part 2 input" do
+    ssl_count = Day7.count(@input, :ssl)
+    IO.puts "#{ssl_count} addresses support SSL"
+    assert 231 = ssl_count
   end
 end
 
