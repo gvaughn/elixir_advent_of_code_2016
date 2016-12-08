@@ -4,40 +4,41 @@ defmodule Day8 do
   @scanner ~r{(^(rect) (\d+)x(\d+)$)|(^(rotate column) x=(\d+) by (\d+)$)|(^(rotate row) y=(\d+) by (\d+)$)}
 
   def light_em_up(input, screen \\ @initial_screen) do
-    output_screen = input
+    screen = input
       |> String.split("\n", trim: true)
       |> Enum.reduce(screen, &instruction/2)
-    {output_screen, count(output_screen)}
+
+    {screen, count(screen)}
   end
 
-  def to_s(screen), do: Enum.map_join(0..5, "\n", fn row -> extract_row(screen, row) |> Enum.join end)
+  def to_s(screen), do: Enum.map_join(0..5, "\n", &Enum.join(extract_row(screen, &1)))
 
   defp instruction(str, screen) when is_binary(str) do
     with [name, p1, p2] <- Regex.run(@scanner, str) |> Enum.slice(-3, 3),
-                  parts = [name, String.to_integer(p1), String.to_integer(p2)],
-    do: Map.merge(screen, instruction(parts, screen))
+    do: Map.merge(screen, instruction([name, String.to_integer(p1), String.to_integer(p2)], screen))
   end
 
   defp instruction(["rect", x, y], _screen), do: for i <- 0..(x-1), j <- 0..(y-1), into: %{}, do: {{i,j}, "#"}
 
   defp instruction(["rotate column", x, distance], screen) do
     extract_col(screen, x)
-    |> rotate_by(6, distance)
+    |> rotate_by(distance)
     |> Enum.into(%{}, fn {char, y} -> {{x,y}, char} end)
   end
 
   defp instruction(["rotate row", y, distance], screen) do
     extract_row(screen, y)
-    |> rotate_by(50, distance)
+    |> rotate_by(distance)
     |> Enum.into(%{}, fn {char, x} -> {{x,y}, char} end)
   end
 
-  defp rotate_by(enum, modulo, distance) do
-    enum
-    |> Stream.cycle
-    |> Stream.drop(modulo - distance)
-    |> Stream.take(modulo)
-    |> Enum.with_index
+  defp rotate_by(enum, distance) do
+    with modulo <- length(enum),
+    do: enum
+      |> Stream.cycle
+      |> Stream.drop(modulo - distance)
+      |> Stream.take(modulo)
+      |> Enum.with_index
   end
 
   defp extract_row(screen, row), do: Enum.filter(screen, &match?({{_, ^row}, _}, &1)) |> to_contents
@@ -69,7 +70,7 @@ defmodule Day7Test do
     assert 6 = count
     {screen, count} = Day8.light_em_up("rotate row y=0 by 4", screen)
     assert 6 = count
-    {screen, count} = Day8.light_em_up("rotate column x=1 by 1", screen)
+    {_screen, count} = Day8.light_em_up("rotate column x=1 by 1", screen)
     assert 6 = count
   end
 
