@@ -1,38 +1,43 @@
 defmodule Day9 do
 
-  def brute_force(input, version \\ :v1), do: brute_force(input, nil, [], version)
+  def parse(input, :brute, v),   do: parse(input, nil, [], v, brute_handlers)
+  def parse(input, :elegant, v), do: parse(input, nil,  0, v, elegant_handlers)
 
-  def elegant_length(input, version \\ :v1), do: elegant_length(input, nil, 0, version)
-
-  defp brute_force("", _instr, iodata, _), do: :erlang.iolist_to_binary(iodata)
-  defp brute_force(<<"(", rest::binary>>, nil, iodata, v), do: brute_force(rest, [], iodata, v)
-  defp brute_force(<<")", rest::binary>>, instr, iodata, v) do
-    [char_count, dup_times] = instr |> :erlang.iolist_to_binary |> String.split("x") |> Enum.map(&String.to_integer/1)
-    <<to_dup::size(char_count)-binary, rest::binary>> = rest
-    expanded = expand_duplicatee(to_dup, v) |> List.duplicate(dup_times)
-    brute_force(rest, nil, [iodata | expanded], v)
+  defp brute_handlers do
+    { &:erlang.iolist_to_binary/1,         # base case resolver
+      fn data, acc -> [acc | [data] ] end, # normal accumulation to iodata
+      &brute_expander/5                    # handle (1x3) expansion
+    }
   end
-  defp brute_force(<<c::utf8, rest::binary>>, nil, iodata, v), do: brute_force(rest, nil, [iodata | [c]], v)
-  defp brute_force(<<c::utf8, rest::binary>>, instr, iodata, v), do: brute_force(rest, [instr | [c]], iodata, v)
 
-  defp expand_duplicatee(duplicatee, :v1), do: duplicatee
-  defp expand_duplicatee(duplicatee, :v2), do: brute_force(duplicatee, nil, [], :v2)
-
-
-  defp elegant_length("", _instr, count, _), do: count
-  defp elegant_length(<<"(", rest::binary>>, nil, count, v), do: elegant_length(rest, [], count, v)
-  defp elegant_length(<<")", rest::binary>>, instr, count, v) do
-    [char_count, dup_times] = instr |> :erlang.iolist_to_binary |> String.split("x") |> Enum.map(&String.to_integer/1)
-    <<to_dup::size(char_count)-binary, rest::binary>> = rest
-    added_count = if v == :v1 do
-      char_count * dup_times
-    else
-      elegant_length(to_dup, nil, 0, :v2) * dup_times
-    end
-    elegant_length(rest, nil, count + added_count, v)
+  defp elegant_handlers do
+    { &(&1),                          # base case resolver
+      fn _data, acc ->  acc + 1 end,  # normal accumulation to count
+      &elegant_expander/5             # handle (1x3) expansion
+    }
   end
-  defp elegant_length(<<_c::utf8, rest::binary>>, nil, count, v), do: elegant_length(rest, nil, count+1, v)
-  defp elegant_length(<<c::utf8, rest::binary>>, instr, count, v), do: elegant_length(rest, [instr | [c]], count, v)
+
+  defp brute_expander(dup_times, duplicatee, acc, :v1, {_, accumulator, _}),     do: duplicatee |>                         List.duplicate(dup_times) |> accumulator.(acc)
+  defp brute_expander(dup_times, duplicatee, acc, :v2, {_, accumulator, _} = h), do: parse(duplicatee, nil, [], :v2, h) |> List.duplicate(dup_times) |> accumulator.(acc)
+
+  defp elegant_expander(dup_times, duplicatee, acc, :v1, _h), do: acc + (String.length(duplicatee)         * dup_times)
+  defp elegant_expander(dup_times, duplicatee, acc, :v2, h),  do: acc + (parse(duplicatee, nil, 0, :v2, h) * dup_times)
+
+  defp parse("", _, acc, _, {base_case, _, _}), do: base_case.(acc)
+  defp parse(<<")", rest::binary>>, instr, acc, v, {_, _, expander} = h) do #perform expansion instruction
+    {rest, to_dup, dup_times} = parse_instr(instr, rest)
+    new_acc = expander.(dup_times, to_dup, acc, v, h)
+    parse(rest, nil, new_acc, v, h)
+  end
+  defp parse(<<"(", rest::binary>>, nil, acc, v, h), do: parse(rest, [], acc, v, h) #start collecting instruction
+  defp parse(<<c::utf8, rest::binary>>, nil, acc, v, {_, accumulator, _} = h), do: parse(rest, nil, accumulator.(c, acc), v, h) #normal accumulate
+  defp parse(<<c::utf8, rest::binary>>, instr, acc, v, h), do: parse(rest, [instr | [c]], acc, v, h) #add to instruction
+
+  defp parse_instr(instr, input) do
+    [char_count, dup_times] = instr |> :erlang.iolist_to_binary |> String.split("x") |> Enum.map(&String.to_integer/1)
+    <<to_dup::size(char_count)-binary, rest::binary>> = input
+    {rest, to_dup, dup_times}
+  end
 end
 
 ExUnit.start()
@@ -43,55 +48,55 @@ defmodule Day9Test do
 
   describe "brute_force" do
     test "part 1 examples" do
-      assert 6 = Day9.brute_force("ADVENT") |> String.length
-      assert 7 = Day9.brute_force("A(1x5)BC") |> String.length
-      assert 9 = Day9.brute_force("(3x3)XYZ") |> String.length
-      assert 11 = Day9.brute_force("A(2x2)BCD(2x2)EFG") |> String.length
-      assert 6 = Day9.brute_force("(6x1)(1x3)A") |> String.length
-      assert 18 = Day9.brute_force("X(8x2)(3x3)ABCY") |> String.length
+      assert 6 = Day9.parse("ADVENT", :brute, :v1) |> String.length
+      assert 7 = Day9.parse("A(1x5)BC", :brute, :v1) |> String.length
+      assert 9 = Day9.parse("(3x3)XYZ", :brute, :v1) |> String.length
+      assert 11 = Day9.parse("A(2x2)BCD(2x2)EFG", :brute, :v1) |> String.length
+      assert 6 = Day9.parse("(6x1)(1x3)A", :brute, :v1) |> String.length
+      assert 18 = Day9.parse("X(8x2)(3x3)ABCY", :brute, :v1) |> String.length
     end
 
     test "part 2 examples" do
-      assert 6 = Day9.brute_force("ADVENT", :v2) |> String.length
-      assert 20 = Day9.brute_force("X(8x2)(3x3)ABCY", :v2) |> String.length
-      assert 241920 = Day9.brute_force("(27x12)(20x12)(13x14)(7x10)(1x12)A", :v2) |> String.length
-      assert 445 = Day9.brute_force("(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN", :v2) |> String.length
+      assert 6 = Day9.parse("ADVENT", :brute, :v2) |> String.length
+      assert 20 = Day9.parse("X(8x2)(3x3)ABCY", :brute, :v2) |> String.length
+      assert 241920 = Day9.parse("(27x12)(20x12)(13x14)(7x10)(1x12)A", :brute, :v2) |> String.length
+      assert 445 = Day9.parse("(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN", :brute, :v2) |> String.length
     end
 
     test "part 1 input" do
-      assert 99145 = Day9.brute_force(@input) |> String.length
+      assert 99145 = Day9.parse(@input, :brute, :v1) |> String.length
     end
 
     @tag skip: "20-ish minutes slow"
     @tag timeout: 300000
     test "part 2 input" do
-      assert 10943094568 = Day9.brute_force(@input, :v2) |> String.length
+      assert 10943094568 = Day9.parse(@input, :brute, :v2) |> String.length
     end
   end
 
   describe "elegant_length" do
     test "part 1 examples" do
-      assert 6 = Day9.elegant_length("ADVENT")
-      assert 7 = Day9.elegant_length("A(1x5)BC")
-      assert 9 = Day9.elegant_length("(3x3)XYZ")
-      assert 11 = Day9.elegant_length("A(2x2)BCD(2x2)EFG")
-      assert 6 = Day9.elegant_length("(6x1)(1x3)A")
-      assert 18 = Day9.elegant_length("X(8x2)(3x3)ABCY")
+      assert 6 = Day9.parse("ADVENT", :elegant, :v1)
+      assert 7 = Day9.parse("A(1x5)BC", :elegant, :v1)
+      assert 9 = Day9.parse("(3x3)XYZ", :elegant, :v1)
+      assert 11 = Day9.parse("A(2x2)BCD(2x2)EFG", :elegant, :v1)
+      assert 6 = Day9.parse("(6x1)(1x3)A", :elegant, :v1)
+      assert 18 = Day9.parse("X(8x2)(3x3)ABCY", :elegant, :v1)
     end
 
     test "part 2 examples" do
-      assert 6 = Day9.elegant_length("ADVENT", :v2)
-      assert 20 = Day9.elegant_length("X(8x2)(3x3)ABCY", :v2)
-      assert 241920 = Day9.elegant_length("(27x12)(20x12)(13x14)(7x10)(1x12)A", :v2)
-      assert 445 = Day9.elegant_length("(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN", :v2)
+      assert 6 = Day9.parse("ADVENT", :elegant, :v2)
+      assert 20 = Day9.parse("X(8x2)(3x3)ABCY", :elegant, :v2)
+      assert 241920 = Day9.parse("(27x12)(20x12)(13x14)(7x10)(1x12)A", :elegant, :v2)
+      assert 445 = Day9.parse("(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN", :elegant, :v2)
     end
 
     test "part 1 input" do
-      assert 99145 = Day9.elegant_length(@input)
+      assert 99145 = Day9.parse(@input, :elegant, :v1)
     end
 
     test "part 2 input" do
-      assert 10943094568 = Day9.elegant_length(@input, :v2)
+      assert 10943094568 = Day9.parse(@input, :elegant, :v2)
     end
   end
 end
